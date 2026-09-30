@@ -61,7 +61,6 @@ filterwarnings = ["error::FutureWarning", "error::DeprecationWarning:powerbackte
 line-length = 100
 target-version = "py311"
 src = ["src", "tests"]
-extend-exclude = ["src/strategy", "src/engine", "src/data", "src/utils", "src/__init__.py", "tests/strategy", "tests/test_data_resampler.py", "tests/conftest.py", "main.py", "setup.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "PD002", "NPY"]
