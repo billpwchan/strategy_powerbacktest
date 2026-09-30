@@ -12,6 +12,7 @@ from __future__ import annotations
 import glob
 import sqlite3
 from collections.abc import Iterable
+from contextlib import closing
 from pathlib import Path
 
 import numpy as np
@@ -86,7 +87,7 @@ def ticks_to_minute_bars(
 ) -> pd.DataFrame:
     frames = []
     for path in expand_paths(db_patterns):
-        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as conn:
+        with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as conn:
             frames.append(
                 pd.read_sql_query(
                     "SELECT ts_ms, price, volume, turnover FROM ticks "

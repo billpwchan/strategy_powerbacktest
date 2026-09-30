@@ -68,7 +68,6 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "PD002", "NPY"]
 ignore = ["RUF001", "RUF002", "RUF003", "E501"]
 
 [tool.mypy]
-python_version = "3.11"
 plugins = ["pydantic.mypy"]
 files = ["src/powerbacktest"]
 ignore_missing_imports = true
