@@ -2,7 +2,7 @@
 
 ## 1.0.0 (2026-09-30)
 
-A full rewrite as the installable package `powerbacktest` (`pip install -e .`, command `pbt`). The 0.1 code is left in place under `src/{data,engine,strategy,utils,templates}`, `main.py`, `setup.py`, `requirements.txt` and `config.yaml` until it is deleted. The new package does not import it.
+A full rewrite as the installable package `powerbacktest` (`pip install -e .`, command `pbt`). The 0.1 code (`main.py`, `setup.py`, `requirements.txt`, `config.yaml`, `src/{data,engine,strategy,utils,templates}` and its tests) is removed; it remains in the git history at 140aa22. `python main.py ...` becomes `pbt run ...`, and `config.yaml` becomes `configs/example.yaml` (new schema; `pbt init` copies it).
 
 ### Why 0.1 was replaced
 
@@ -62,4 +62,4 @@ An audit of 0.1 at commit 140aa22 found the following. Each item was reproduced 
 - **Metrics.** Data-driven annualisation, peak-to-recovery drawdowns, monthly table, trade statistics with MAE/MFE, and benchmark beta, alpha and information ratio against an index or buy and hold.
 - **Report.** Single-file offline HTML with equity, drawdown, monthly heatmap, metrics, a sortable symbol table, candlesticks with trades and indicators, correlation, drawdown table, assumptions and the resolved config; light and dark themes; red-up/green-up toggle. Also writes `result.json` plus CSVs.
 - **Optimisation.** Grid search with an in/out-of-sample split or an anchored walk-forward, run in parallel.
-- **Tooling.** `pyproject.toml` with Python 3.11+ and pandas 2.2 or 3; ruff, mypy, pytest (87 tests, including property-based accounting invariants and a regression test for every defect found in review); GitHub Actions CI.
+- **Tooling.** `pyproject.toml` with Python 3.11+ and pandas 2.2 or 3; ruff, mypy, pytest (88 tests, including property-based accounting invariants and a regression test for every defect found in review); GitHub Actions CI.

@@ -178,13 +178,13 @@ tests/powerbacktest/    pytest suite: hand-computed fees and fills, accounting i
 docs/ARCHITECTURE.md    design decisions, assumptions and known limitations
 ```
 
-The pre-1.0 implementation (`src/data`, `src/engine`, `src/strategy`, `src/utils`, `src/templates`, `main.py`, `setup.py`, `requirements.txt`, `config.yaml`, `tests/strategy`, `tests/test_data_resampler.py`) is still in the tree. It is not installed or imported by the new package and is kept only until it is deleted; see [CHANGELOG.md](CHANGELOG.md) for why it was replaced.
+The pre-1.0 implementation (`main.py`, `src/{data,engine,strategy,utils}`) has been removed; [CHANGELOG.md](CHANGELOG.md) records why it was replaced, and it remains in the git history before 1.0.
 
 ## Development
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 87 tests
+pytest                      # 88 tests
 ruff check . && ruff format --check . && mypy
 ```
 
