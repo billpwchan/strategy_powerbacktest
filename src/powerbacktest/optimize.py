@@ -32,7 +32,11 @@ import yaml
 from powerbacktest.config import RunConfig
 from powerbacktest.engine.runner import LoadedData, run_on_bars
 from powerbacktest.errors import ConfigError, DataError, StrategyError
-from powerbacktest.strategy.registry import create_strategy, get_strategy_class
+from powerbacktest.strategy.registry import (
+    create_strategy,
+    get_strategy_class,
+    load_strategy_paths,
+)
 
 log = logging.getLogger(__name__)
 
@@ -95,7 +99,11 @@ _STATE: dict[str, Any] = {}
 
 
 def _init_worker(config_json: str, loaded: LoadedData) -> None:
-    _STATE["config"] = RunConfig.model_validate_json(config_json)
+    config = RunConfig.model_validate_json(config_json)
+    # Worker processes started with "spawn" (macOS, Windows) do not inherit registrations.
+    if config.backtest.strategy_paths:
+        load_strategy_paths(config.backtest.strategy_paths)
+    _STATE["config"] = config
     _STATE["loaded"] = loaded
 
 
@@ -210,37 +218,31 @@ def optimize(config: RunConfig, loaded: LoadedData) -> OptimizeResult:
         if not bt.start < opt.split <= bt.end:
             raise ConfigError(f"optimize.split {opt.split} must fall inside {bt.start}..{bt.end}")
         is_end = opt.split - timedelta(days=1)
-        in_sample = _filter(
-            _run_tasks(config, loaded, [(c, bt.start, is_end) for c in combos], opt.jobs),
-            opt.min_trades,
+        in_sample_all = _run_tasks(
+            config, loaded, [(c, bt.start, is_end) for c in combos], opt.jobs
         )
-        ranked = sorted(
-            (r for r in in_sample if "error" not in r),
-            key=lambda r: _score(r["metrics"], metric),
-            reverse=True,
-        )
+        ranked = _ranked(_filter(in_sample_all, opt.min_trades), metric)
         top = ranked[: opt.top]
         oos = _run_tasks(config, loaded, [(r["params"], opt.split, bt.end) for r in top], opt.jobs)
-        is_rows, skipped = _rows(ranked, "is_")
-        oos_rows, _ = _rows(oos, "oos_")
+        is_rows, _ = _rows(ranked, "is_")
+        oos_rows, oos_errors = _rows(oos, "oos_")
         table = pd.DataFrame(is_rows)
         if oos_rows:
             oos_frame = pd.DataFrame(oos_rows)
             keys = [c for c in oos_frame.columns if c.startswith("param_")]
             table = table.merge(oos_frame, on=keys, how="left")
+        skipped = [r for r in in_sample_all if "error" in r] + oos_errors
         return OptimizeResult(metric, "split", table, skipped=skipped)
 
-    results = _filter(
-        _run_tasks(config, loaded, [(c, bt.start, bt.end) for c in combos], opt.jobs),
-        opt.min_trades,
-    )
-    ranked = sorted(
-        (r for r in results if "error" not in r),
-        key=lambda r: _score(r["metrics"], metric),
-        reverse=True,
-    )
-    rows, skipped = _rows(ranked, "")
+    results = _run_tasks(config, loaded, [(c, bt.start, bt.end) for c in combos], opt.jobs)
+    rows, _ = _rows(_ranked(_filter(results, opt.min_trades), metric), "")
+    skipped = [r for r in results if "error" in r]
     return OptimizeResult(metric, "full", pd.DataFrame(rows), skipped=skipped)
+
+
+def _ranked(results: list[dict[str, Any]], metric: str) -> list[dict[str, Any]]:
+    ok = (r for r in results if "error" not in r)
+    return sorted(ok, key=lambda r: _score(r["metrics"], metric), reverse=True)
 
 
 def fold_bounds(start: date, end: date, folds: int) -> list[tuple[date, date, date, date]]:

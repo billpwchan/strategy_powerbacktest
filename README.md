@@ -73,7 +73,7 @@ These are the defaults. Each one is a config field, and the report's Assumptions
 - **US costs.** Futu's per-share commission and platform fee with their minimums, plus settlement fee and the sell-side SEC Section 31 fee and FINRA TAF, each by date.
 - **Prices.** Forward-adjusted (qfq) by default, like TDX. When a new dividend changes the adjustment, the cache detects it and re-downloads the series instead of mixing old and new adjustments.
 - **Entries.** By default a symbol is not bought mid-signal at the start of the test or straight after a stop-out; the signal has to reset first.
-- **Risk exits.** Optional stop loss, trailing stop and take profit fill intrabar at the level, or at the open on a gap. If a stop and a target are both inside one bar, the stop is assumed to hit first. `max_holding_bars` exits at the next open.
+- **Risk exits.** Optional stop loss, trailing stop and take profit fill intrabar at the level, or at the open when the bar gaps through either one. If a stop and a target are both inside one bar, the stop is assumed to hit first. `max_holding_bars: N` exits at the next open after N bars have been held.
 - **Modes.**
   - `scan` (default): simulates each symbol alone with the full capital, and answers "which stocks does this strategy work on". The Composite book averages them.
   - `portfolio`: shares one cash balance, sized by `equal_weight` across `max_positions`, a fixed value, fixed lots, a percentage of equity, or all-in.
@@ -184,7 +184,7 @@ The pre-1.0 implementation (`src/data`, `src/engine`, `src/strategy`, `src/utils
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 75 tests
+pytest                      # 87 tests
 ruff check . && ruff format --check . && mypy
 ```
 

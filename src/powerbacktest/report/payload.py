@@ -15,7 +15,13 @@ import numpy as np
 import pandas as pd
 
 from powerbacktest import __version__
-from powerbacktest.analytics.metrics import bar_returns, drawdown, drawdown_periods, monthly_returns
+from powerbacktest.analytics.metrics import (
+    align_series,
+    bar_returns,
+    drawdown,
+    drawdown_periods,
+    monthly_returns,
+)
 from powerbacktest.config import dump_config
 from powerbacktest.engine.runner import COMPOSITE, PORTFOLIO, BacktestResult
 from powerbacktest.engine.types import Book
@@ -65,7 +71,9 @@ def _book_payload(book: Book, max_points: int) -> dict[str, Any]:
     monthly = monthly_returns(book.equity, book.initial_capital)
     bench = None
     if book.benchmark is not None:
-        bench = book.benchmark.reindex(book.equity.index).ffill().fillna(book.initial_capital)
+        bench = align_series(
+            book.benchmark, pd.DatetimeIndex(book.equity.index), book.initial_capital
+        )
     return {
         "name": book.name,
         "currency": book.currency,

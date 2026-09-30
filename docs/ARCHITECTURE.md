@@ -70,6 +70,14 @@ Bars are merged on their **close** time in UTC. Daily bars close at the market c
 
 An order decided at bar t can only fill at bar t+1 (`fill: next_open`). An order left over after a symbol's last bar expires and is logged.
 
+**Risk exits.** Levels are checked in the order the prices trade: a gap through the stop or the target fills at the open; otherwise, if both levels are inside the bar's range, the stop is assumed to hit first (the path within a bar is unknown). `max_holding_bars: N` counts bars held through the close, the entry bar included for next-open entries, and exits at the next open.
+
+**Slots.** `max_positions` counts positions that will still be held after pending sells fill, and is checked again at the open after those sells execute. A symbol that sells at bar t therefore frees its slot for a buy decided at the same close.
+
+**Partial exits.** With `max_volume_pct`, a sell may be split over several bars. A slice whose proceeds would not cover its fixed fees (HK$15 platform fee, minimum commission) is deferred rather than sold, so cash only goes negative in the one case a real account would also be debited: closing a whole position worth less than its fees.
+
+**Per-bar hook.** `Strategy.on_bar` receives the bars and indicators *up to and including* the current bar only. The look-ahead check exercises `indicators` and `signals`, not `on_bar`.
+
 **Entry blocking.** With `entry_requires_fresh_signal` (the default), a symbol is blocked at the start and after a stop, target or max-hold exit. It is unblocked on the first bar whose signal is not 1. This stops state-style strategies from buying mid-trend on day one or straight back in after a stop, while event-style strategies (crosses) are unaffected.
 
 ## Costs
@@ -96,6 +104,12 @@ Broker fees default to Futu HK's fixed plan and are configurable. US uses Futu's
 Tests assert that every built-in strategy passes and that raw ZIG fails.
 
 `tdx.point_in_time(fn, frame, window)` is the generic cure for repainting formulas. It evaluates `fn` on each bar's trailing window and keeps only the last value. The cost is O(n × window).
+
+## Benchmarks
+
+The index benchmark (`backtest.benchmark`) is sampled at each book's timestamps with the last value at or before each point, compared in UTC so HK and US calendars line up, and rebased to the initial capital at the book's first bar. A symbol that starts trading late (short history, IPO) is therefore compared with the index over its own span only. Buy and hold is computed per book with the same lots, slippage and entry costs.
+
+In scan mode with symbols from different markets, the Composite book joins daily books on trading date rather than on instants.
 
 ## Metrics
 

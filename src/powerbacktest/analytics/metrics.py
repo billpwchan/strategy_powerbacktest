@@ -212,13 +212,33 @@ def return_metrics(
     }
 
 
+def align_series(
+    series: pd.Series, index: pd.DatetimeIndex, initial: float, *, rebase: bool = False
+) -> pd.Series:
+    """Sample ``series`` at ``index``: the last value at or before each point, compared in UTC
+    so different exchange timezones line up. Points before the series starts take ``initial``.
+    With ``rebase``, the result is scaled to equal ``initial`` at the first point, so a
+    benchmark is measured over exactly the same span as the equity curve.
+    """
+    src = series.dropna().sort_index()
+    src_utc = pd.Series(src.to_numpy(float), index=pd.DatetimeIndex(src.index).tz_convert("UTC"))
+    src_utc = src_utc[~src_utc.index.duplicated(keep="last")]
+    target = pd.DatetimeIndex(index).tz_convert("UTC")
+    aligned = src_utc.reindex(src_utc.index.union(target)).ffill().reindex(target)
+    aligned.index = index
+    if rebase:
+        first = aligned.first_valid_index()
+        if first is not None:
+            aligned = aligned / float(aligned.loc[first]) * initial
+    return aligned.fillna(initial)
+
+
 def benchmark_metrics(
     equity: pd.Series, bench: pd.Series, initial: float, *, fallback_ppy: float
 ) -> dict[str, float]:
-    aligned = bench.reindex(equity.index).ffill()
-    if aligned.isna().all():
+    if bench.dropna().empty:
         return {}
-    aligned = aligned.fillna(initial)
+    aligned = align_series(bench, pd.DatetimeIndex(equity.index), initial)
     r = bar_returns(equity, initial)
     rb = bar_returns(aligned, initial)
     ppy = periods_per_year(pd.DatetimeIndex(equity.index), fallback_ppy)
@@ -272,6 +292,10 @@ def book_metrics(book: Book, *, fallback_ppy: float, risk_free_rate: float = 0.0
             )
         )
     if book.buy_hold is not None:
-        bh_final = float(book.buy_hold.reindex(book.equity.index).ffill().iloc[-1])
+        bh_final = float(
+            align_series(
+                book.buy_hold, pd.DatetimeIndex(book.equity.index), book.initial_capital
+            ).iloc[-1]
+        )
         m["buy_hold_return"] = bh_final / book.initial_capital - 1
     return m

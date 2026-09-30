@@ -80,7 +80,10 @@ class BTSEStrategy(Strategy):
 
     def warmup_bars(self) -> int:
         p = self.params
-        return p.dmi_period + 2 * p.adx_period + 1
+        dmi = p.dmi_period + 2 * p.adx_period + 1
+        # Point-in-time ZIG looks back pit_window bars; with that much history before the
+        # first trade, signals no longer depend on where the data happens to start.
+        return max(dmi, p.pit_window) if p.zig_mode == "pit" else dmi
 
     @property
     def lookahead_safe(self) -> bool:

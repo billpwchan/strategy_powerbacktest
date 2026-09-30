@@ -64,6 +64,12 @@ class Trade:
     mark_price: float | None = None
     mae_pct: float | None = None
     mfe_pct: float | None = None
+    # How the entry/exit filled: "open", "close", "intrabar" or "end".
+    entry_fill: str = "open"
+    exit_fill: str | None = None
+    # Shares still held when an open trade is marked (may be less than ``quantity`` after
+    # partial, volume-capped exits).
+    open_quantity: int = 0
 
     @property
     def entry_price(self) -> float:
@@ -81,10 +87,11 @@ class Trade:
 
     @property
     def pnl(self) -> float:
+        realised = self.exit_value - self.exit_fees - self.entry_value - self.entry_fees
         if self.is_open:
             assert self.mark_price is not None
-            return self.quantity * self.mark_price - self.entry_value - self.entry_fees
-        return self.exit_value - self.exit_fees - self.entry_value - self.entry_fees
+            return realised + self.open_quantity * self.mark_price
+        return realised
 
     @property
     def return_pct(self) -> float:
@@ -109,6 +116,7 @@ class Trade:
             "entry_time": self.entry_time.isoformat(),
             "exit_time": self.exit_time.isoformat() if self.exit_time is not None else None,
             "quantity": self.quantity,
+            "open_quantity": self.open_quantity if self.is_open else 0,
             "entry_price": self.entry_price,
             "exit_price": self.exit_price,
             "pnl": self.pnl,

@@ -26,6 +26,7 @@ prices are clamped to the bar's high/low.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -67,7 +68,7 @@ class SymbolFeed:
         self.h = self.bars["high"].to_numpy(float)
         self.lo = self.bars["low"].to_numpy(float)
         self.c = self.bars["close"].to_numpy(float)
-        self.v = self.bars["volume"].to_numpy(float)
+        self.v = np.nan_to_num(self.bars["volume"].to_numpy(float), nan=0.0)
 
     @property
     def symbol(self) -> str:
@@ -91,6 +92,29 @@ def bar_close_ns(index: pd.DatetimeIndex, instrument: Instrument) -> np.ndarray:
         close = instrument.market.close_time
         local = local.normalize() + pd.Timedelta(hours=close.hour, minutes=close.minute)
     return local.tz_convert("UTC").tz_localize(None).as_unit("ns").to_numpy().astype("int64")
+
+
+def fit_lots(
+    max_lots: int,
+    lot: int,
+    price: float,
+    fees: Callable[[int], FeeBreakdown],
+    limit: float,
+) -> tuple[int, FeeBreakdown]:
+    """Largest quantity of at most ``max_lots`` lots whose cost plus fees fits ``limit``.
+
+    Binary search: fees never decrease with size, so feasibility is monotonic.
+    """
+    lo, hi = 0, max(int(max_lots), 0)
+    best = (0, FeeBreakdown())
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        f = fees(mid * lot)
+        if mid * lot * price + f.total <= limit + 1e-9:
+            lo, best = mid, (mid * lot, f)
+        else:
+            hi = mid - 1
+    return best
 
 
 @dataclass
@@ -183,8 +207,16 @@ class Simulator:
     def equity(self) -> float:
         return self.cash + self._holdings_value()
 
-    def _open_count(self) -> int:
+    def _held_count(self) -> int:
         return sum(1 for p in self.positions.values() if p.quantity > 0)
+
+    def _open_count(self) -> int:
+        """Positions that will still be held after pending sells fill."""
+        return sum(
+            1
+            for sym, p in self.positions.items()
+            if p.quantity > 0 and not (sym in self.pending and self.pending[sym].side == "SELL")
+        )
 
     def _pending_buys(self) -> int:
         return sum(1 for o in self.pending.values() if o.side == "BUY")
@@ -208,25 +240,21 @@ class Simulator:
             return min(self.cash, self.pf.value)
         return self.cash  # fixed_lots: bounded by cash only
 
-    def _buy(self, feed: SymbolFeed, i: int, base_price: float, reason: str) -> None:
+    def _buy(self, feed: SymbolFeed, i: int, base_price: float, reason: str, kind: str) -> None:
         inst = feed.instrument
         lot = inst.lot_size
         price = min(base_price + self._slip(base_price, feed, i), feed.h[i])
         budget = self._budget()
         if self.sizer == "fixed_lots":
-            qty = self.pf.lots * lot
+            max_lots = self.pf.lots
         else:
-            qty = int(budget / price // lot) * lot if price > 0 else 0
+            max_lots = int(budget / price // lot) if price > 0 else 0
         if self.ex.max_volume_pct is not None:
-            cap = int(feed.v[i] * self.ex.max_volume_pct // lot) * lot
-            qty = min(qty, cap)
+            max_lots = min(max_lots, int(feed.v[i] * self.ex.max_volume_pct // lot))
         limit = min(budget, self.cash)
-        fees = FeeBreakdown()
-        while qty > 0:
-            fees = self._fees("BUY", qty, price, feed, i)
-            if qty * price + fees.total <= limit + 1e-9:
-                break
-            qty -= lot
+        qty, fees = fit_lots(
+            max_lots, lot, price, lambda q: self._fees("BUY", q, price, feed, i), limit
+        )
         if qty <= 0:
             need = lot * price + self._fees("BUY", lot, price, feed, i).total
             self._event(feed, i, "buy_skipped", f"budget {limit:,.2f} < one lot {need:,.2f}")
@@ -243,6 +271,7 @@ class Simulator:
                 quantity=0,
                 entry_value=0.0,
                 entry_fees=0.0,
+                entry_fill=kind,
             )
             pos.peak = price
         assert pos.trade is not None
@@ -252,11 +281,12 @@ class Simulator:
         pos.trade.entry_fees += fees.total
         self.fills.append(fill)
 
-    def _sell(self, feed: SymbolFeed, i: int, price: float, reason: str) -> None:
+    def _sell(self, feed: SymbolFeed, i: int, price: float, reason: str, kind: str) -> None:
         pos = self.positions[feed.symbol]
         qty = pos.quantity
         if qty <= 0:
             return
+        price = max(price, feed.lo[i])
         if self.ex.max_volume_pct is not None and reason == "signal":
             lot = feed.instrument.lot_size
             cap = int(feed.v[i] * self.ex.max_volume_pct // lot) * lot
@@ -265,8 +295,12 @@ class Simulator:
                 self._event(feed, i, "sell_deferred", "volume cap below one lot")
                 self.pending[feed.symbol] = _Order("SELL", reason, i)
                 return
-        price = max(price, feed.lo[i])
         fees = self._fees("SELL", qty, price, feed, i)
+        if qty < pos.quantity and qty * price <= fees.total:
+            # A volume-capped slice that would not even cover its fixed fees: wait for volume.
+            self._event(feed, i, "sell_deferred", "capped slice proceeds below fees")
+            self.pending[feed.symbol] = _Order("SELL", reason, i)
+            return
         fill = Fill(feed.symbol, feed.bars.index[i], "SELL", qty, price, fees, reason, i)
         self.cash += fill.cash_delta
         self.fills.append(fill)
@@ -279,6 +313,7 @@ class Simulator:
             trade.exit_time = feed.bars.index[i]
             trade.exit_index = i
             trade.exit_reason = reason
+            trade.exit_fill = kind
             self._excursions(feed, trade)
             self.trades.append(trade)
             pos.trade = None
@@ -289,13 +324,28 @@ class Simulator:
 
     @staticmethod
     def _excursions(feed: SymbolFeed, trade: Trade) -> None:
-        end = trade.exit_index if trade.exit_index is not None else feed.last
-        lows = feed.lo[trade.entry_index : end + 1]
-        highs = feed.h[trade.entry_index : end + 1]
-        if len(lows):
-            entry = trade.entry_price
-            trade.mae_pct = float(lows.min() / entry - 1)
-            trade.mfe_pct = float(highs.max() / entry - 1)
+        """Worst and best price relative to the entry, over the bars actually held.
+
+        A bar entered at its close, or exited at its open or intrabar, contributes only its
+        fill price, because the rest of its range happened outside the holding period.
+        """
+        start = trade.entry_index + (1 if trade.entry_fill == "close" else 0)
+        if trade.is_open or trade.exit_index is None:
+            end = feed.last
+        else:
+            end = trade.exit_index - (0 if trade.exit_fill in ("close", "end") else 1)
+        entry = trade.entry_price
+        points_lo = [entry]
+        points_hi = [entry]
+        exit_price = trade.exit_price
+        if exit_price is not None:
+            points_lo.append(exit_price)
+            points_hi.append(exit_price)
+        if start <= end:
+            points_lo.append(float(feed.lo[start : end + 1].min()))
+            points_hi.append(float(feed.h[start : end + 1].max()))
+        trade.mae_pct = float(min(points_lo) / entry - 1)
+        trade.mfe_pct = float(max(points_hi) / entry - 1)
 
     # ----------------------------------------------------------------- risk
 
@@ -316,18 +366,21 @@ class Simulator:
         o, h, lo = feed.o[i], feed.h[i], feed.lo[i]
         price: float | None = None
         reason = ""
+        # The open trades first, so gaps through either level fill at the open. Inside the bar
+        # the path is unknown; if both levels are in range the stop is assumed to hit first.
+        kind = "intrabar"
         if stop is not None and o <= stop:
-            price, reason = o - self._slip(o, feed, i), stop_reason
+            price, reason, kind = o - self._slip(o, feed, i), stop_reason, "open"
+        elif target is not None and o >= target:
+            price, reason, kind = o, "take_profit", "open"
         elif stop is not None and lo <= stop:
             price, reason = stop - self._slip(stop, feed, i), stop_reason
-        elif target is not None and o >= target:
-            price, reason = o, "take_profit"
         elif target is not None and h >= target:
             price, reason = target, "take_profit"
         if price is None:
             return
         self.pending.pop(feed.symbol, None)
-        self._sell(feed, i, price, reason)
+        self._sell(feed, i, price, reason, kind)
         self.blocked[feed.symbol] = self.ex.entry_requires_fresh_signal
 
     # ------------------------------------------------------------- decisions
@@ -349,8 +402,9 @@ class Simulator:
                 signal=sig,
                 position=pos.quantity,
                 entry_price=pos.avg_price if pos.quantity else None,
-                bars_held=i - pos.entry_index if pos.quantity else 0,
-                indicators=feed.indicators,
+                bars_held=self._bars_held(pos, i),
+                indicators=feed.indicators.iloc[: i + 1],
+                bars=feed.bars.iloc[: i + 1],
             )
             out = self.strategy.on_bar(ctx)
             sig = math.nan if out is None else float(out)
@@ -363,12 +417,14 @@ class Simulator:
             reason = None
             if sig == 0.0:
                 reason = "signal"
-            elif self.risk.max_holding_bars and i - pos.entry_index >= self.risk.max_holding_bars:
+            elif (
+                self.risk.max_holding_bars and self._bars_held(pos, i) >= self.risk.max_holding_bars
+            ):
                 reason = "max_hold"
             if reason is None:
                 return
             if at_close:
-                self._sell(feed, i, feed.c[i] - self._slip(feed.c[i], feed, i), reason)
+                self._sell(feed, i, feed.c[i] - self._slip(feed.c[i], feed, i), reason, "close")
             else:
                 self.pending[sym] = _Order("SELL", reason, i)
             if reason == "max_hold":
@@ -382,9 +438,16 @@ class Simulator:
             self._event(feed, i, "buy_skipped", f"max_positions={self.pf.max_positions} reached")
             return
         if at_close:
-            self._buy(feed, i, feed.c[i], "signal")
+            self._buy(feed, i, feed.c[i], "signal", "close")
         else:
             self.pending[sym] = _Order("BUY", "signal", i)
+
+    @staticmethod
+    def _bars_held(pos: _Position, i: int) -> int:
+        """Bars held through bar i's close; a bar entered at its open counts as held."""
+        if pos.quantity <= 0 or pos.trade is None:
+            return 0
+        return i - pos.entry_index + (1 if pos.trade.entry_fill == "open" else 0)
 
     # ------------------------------------------------------------------ run
 
@@ -407,12 +470,16 @@ class Simulator:
                 order = self.pending.get(f.symbol)
                 if order is not None and order.side == "SELL":
                     del self.pending[f.symbol]
-                    self._sell(f, i, f.o[i] - self._slip(f.o[i], f, i), order.reason)
+                    self._sell(f, i, f.o[i] - self._slip(f.o[i], f, i), order.reason, "open")
             for f, i in active:
                 order = self.pending.get(f.symbol)
                 if order is not None and order.side == "BUY":
                     del self.pending[f.symbol]
-                    self._buy(f, i, f.o[i], order.reason)
+                    if self._held_count() >= self.pf.max_positions:
+                        # A sell counted on at decision time did not fill (e.g. no bar yet).
+                        self._event(f, i, "buy_skipped", "max_positions still full at the open")
+                        continue
+                    self._buy(f, i, f.o[i], order.reason, "open")
             for f, i in active:
                 self._risk_exit(f, i)
             for f, i in active:
@@ -434,7 +501,9 @@ class Simulator:
         if self.ex.liquidate_at_end:
             for f in feeds:
                 if self.positions[f.symbol].quantity:
-                    self._sell(f, f.last, f.c[f.last] - self._slip(f.c[f.last], f, f.last), "end")
+                    self._sell(
+                        f, f.last, f.c[f.last] - self._slip(f.c[f.last], f, f.last), "end", "end"
+                    )
             if len(times):
                 equity[-1] = self.cash + self._holdings_value()
                 cash[-1] = self.cash
@@ -445,6 +514,7 @@ class Simulator:
                 trade = pos.trade
                 trade.is_open = True
                 trade.mark_price = f.c[f.last]
+                trade.open_quantity = pos.quantity
                 self._excursions(f, trade)
                 self.trades.append(trade)
 
@@ -490,14 +560,15 @@ def buy_and_hold(
         lot = f.instrument.lot_size
         tick = tick_size(f.o[i], f.instrument, f.dates[i]) * execution.slippage_ticks
         price = min(f.o[i] + tick + f.o[i] * execution.slippage_bps / 10_000, f.h[i])
-        qty = int(sleeve / price // lot) * lot
-        fees = 0.0
-        while qty > 0:
-            fees = costs.fees("BUY", qty, price, f.instrument, f.dates[i]).total
-            if qty * price + fees <= sleeve:
-                break
-            qty -= lot
-        left = sleeve - (qty * price + fees if qty > 0 else 0.0)
+        inst, day = f.instrument, f.dates[i]
+
+        def buy_fees(
+            q: int, inst: Instrument = inst, day: date = day, px: float = price
+        ) -> FeeBreakdown:
+            return costs.fees("BUY", q, px, inst, day)
+
+        qty, fb = fit_lots(int(sleeve / price // lot), lot, price, buy_fees, sleeve)
+        left = sleeve - (qty * price + fb.total if qty > 0 else 0.0)
         closes = pd.Series(
             f.c[f.first : f.last + 1], index=display_index(f.close_ns[f.first : f.last + 1], [f])
         )

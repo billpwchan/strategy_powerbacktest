@@ -21,7 +21,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from powerbacktest.analytics.metrics import book_metrics
+from powerbacktest.analytics.metrics import align_series, book_metrics
 from powerbacktest.config import CostsConfig, RunConfig
 from powerbacktest.data.manager import DataManager
 from powerbacktest.engine.simulator import (
@@ -30,6 +30,7 @@ from powerbacktest.engine.simulator import (
     bar_close_ns,
     buy_and_hold,
     display_index,
+    is_intraday_index,
 )
 from powerbacktest.engine.types import Book
 from powerbacktest.errors import DataError
@@ -140,16 +141,30 @@ def make_feed(
     return SymbolFeed(instrument, trimmed, ind, sig.to_numpy(float), first, last)
 
 
+def _by_date(series: pd.Series) -> pd.Series:
+    """Re-key a daily series by its local trading date (as UTC midnight)."""
+    local = pd.DatetimeIndex(series.index).tz_localize(None).normalize()
+    out = pd.Series(
+        series.to_numpy(), index=pd.DatetimeIndex(local, name="time").tz_localize("UTC")
+    )
+    return out[~out.index.duplicated(keep="last")]
+
+
 def _composite(books: list[Book], name: str) -> Book:
     n = len(books)
-    index = books[0].equity.index
+    tzs = {str(pd.DatetimeIndex(b.equity.index).tz) for b in books}
+    daily = not any(is_intraday_index(pd.DatetimeIndex(b.equity.index)) for b in books)
+    # Mixed-market daily books are joined on trading date, not on instants, so an HK and a US
+    # bar for the same date form one composite row.
+    key = _by_date if len(tzs) > 1 and daily else (lambda s: s)
+    index = key(books[0].equity).index
     for b in books[1:]:
-        index = index.union(b.equity.index)
+        index = index.union(key(b.equity).index)
 
     def avg(attr: str, fill: float | None) -> pd.Series:
         frames = []
         for b in books:
-            s = getattr(b, attr).reindex(index).ffill()
+            s = key(getattr(b, attr)).reindex(index).ffill()
             frames.append(s.fillna(b.initial_capital if fill is None else fill))
         return pd.concat(frames, axis=1).mean(axis=1)
 
@@ -167,7 +182,7 @@ def _composite(books: list[Book], name: str) -> Book:
     if all(b.buy_hold is not None for b in books):
         comp.buy_hold = pd.concat(
             [
-                b.buy_hold.reindex(index).ffill().fillna(b.initial_capital)
+                key(b.buy_hold).reindex(index).ffill().fillna(b.initial_capital)
                 for b in books
                 if b.buy_hold is not None
             ],
@@ -279,7 +294,12 @@ def run_on_bars(
     fallback = _fallback_ppy(tf, feeds)
     for book in books.values():
         if bench_series is not None:
-            book.benchmark, book.benchmark_name = bench_series, bench_name
+            # Rebased per book, so a symbol that starts trading late (IPO, short history) is
+            # compared with the index over its own trading span only.
+            book.benchmark = align_series(
+                bench_series, pd.DatetimeIndex(book.equity.index), capital, rebase=True
+            )
+            book.benchmark_name = bench_name
         else:
             book.benchmark, book.benchmark_name = book.buy_hold, "Buy & hold"
         scale = book.metrics.pop("_scale", None)
