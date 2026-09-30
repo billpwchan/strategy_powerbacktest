@@ -22,12 +22,13 @@ from __future__ import annotations
 
 import math
 from collections import Counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
 
-from powerbacktest.engine.types import Book, Trade
+if TYPE_CHECKING:  # runtime import would cycle: engine.runner imports this module
+    from powerbacktest.engine.types import Book, Trade
 
 
 def _nan() -> float:

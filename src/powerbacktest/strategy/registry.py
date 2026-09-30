@@ -15,7 +15,7 @@ import importlib.util
 import inspect
 import sys
 from pathlib import Path
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 from powerbacktest.errors import StrategyError
 from powerbacktest.strategy.base import Strategy
@@ -55,10 +55,8 @@ def load_strategy_paths(paths: list[Path]) -> None:
         for file in files:
             module = _load_file(file)
             for _, obj in inspect.getmembers(module, inspect.isclass):
-                if issubclass(obj, Strategy) and obj is not Strategy:
-                    cls = cast(type[Strategy], obj)
-                    if cls.name:
-                        _REGISTRY.setdefault(cls.name, cls)
+                if issubclass(obj, Strategy) and obj is not Strategy and obj.name:
+                    _REGISTRY.setdefault(obj.name, obj)
 
 
 def get_strategy_class(spec: str) -> type[Strategy]:
