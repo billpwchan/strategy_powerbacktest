@@ -103,3 +103,7 @@ optimization_results/
 strategy_results/
 strategy_powerbacktest/
 reports/
+
+# Local data cache and personal configs
+/data/
+config.local.yaml
