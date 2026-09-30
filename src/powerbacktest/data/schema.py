@@ -90,6 +90,10 @@ def validate_bars(bars: pd.DataFrame) -> list[str]:
         problems.append(f"{int((ohlc <= 0).any(axis=1).sum())} bars with non-positive prices")
     if ohlc.isna().any().any():
         problems.append(f"{int(ohlc.isna().any(axis=1).sum())} bars with missing prices")
+    if bars["volume"].isna().any():
+        problems.append(
+            f"{int(bars['volume'].isna().sum())} bars with missing volume (treated as 0 by volume caps)"
+        )
     tol = 1e-9
     bad_high = bars["high"] + tol < bars[["open", "close"]].max(axis=1)
     bad_low = bars["low"] - tol > bars[["open", "close"]].min(axis=1)

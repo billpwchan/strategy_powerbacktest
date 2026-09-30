@@ -62,4 +62,4 @@ An audit of 0.1 at commit 140aa22 found the following. Each item was reproduced 
 - **Metrics.** Data-driven annualisation, peak-to-recovery drawdowns, monthly table, trade statistics with MAE/MFE, and benchmark beta, alpha and information ratio against an index or buy and hold.
 - **Report.** Single-file offline HTML with equity, drawdown, monthly heatmap, metrics, a sortable symbol table, candlesticks with trades and indicators, correlation, drawdown table, assumptions and the resolved config; light and dark themes; red-up/green-up toggle. Also writes `result.json` plus CSVs.
 - **Optimisation.** Grid search with an in/out-of-sample split or an anchored walk-forward, run in parallel.
-- **Tooling.** `pyproject.toml` with Python 3.11+ and pandas 2.2 or 3; ruff, mypy, pytest (75 tests, including property-based accounting invariants); GitHub Actions CI.
+- **Tooling.** `pyproject.toml` with Python 3.11+ and pandas 2.2 or 3; ruff, mypy, pytest (87 tests, including property-based accounting invariants and a regression test for every defect found in review); GitHub Actions CI.

@@ -57,7 +57,9 @@ class BarContext:
     position: int
     entry_price: float | None
     bars_held: int
+    # History up to and including this bar only; later rows are never exposed.
     indicators: pd.DataFrame
+    bars: pd.DataFrame
 
     def indicator(self, column: str) -> float:
         return float(self.indicators[column].to_numpy(dtype=float)[self.index])

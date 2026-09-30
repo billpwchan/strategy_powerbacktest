@@ -204,7 +204,8 @@ def test_take_profit_trailing_and_max_hold():
 
     flat = bars_from_prices([10.0] * 8)
     mh = simulate(flat, [1], ex=ex, risk=RiskConfig(max_holding_bars=3))
-    assert [f.bar_index for f in mh.fills] == [1, 5]
+    # entered at bar 1 open; after 3 held bars (1, 2, 3) it exits at bar 4 open
+    assert [f.bar_index for f in mh.fills] == [1, 4]
     assert mh.fills[1].reason == "max_hold"
 
 
