@@ -204,7 +204,9 @@ def _index_benchmark(
     if len(idx) == 0:
         return None
     sel = bars.iloc[idx]
-    closes = pd.Series(sel["close"].to_numpy(float), index=bar_close_ns(sel.index, instrument))
+    closes = pd.Series(
+        sel["close"].to_numpy(float), index=bar_close_ns(pd.DatetimeIndex(sel.index), instrument)
+    )
     feed_like = SymbolFeed(
         instrument, sel, pd.DataFrame(index=sel.index), np.zeros(len(sel)), 0, len(sel) - 1
     )
@@ -256,7 +258,7 @@ def run_on_bars(
     sizer = config.portfolio.resolved_sizer(bt.mode)
     capital = bt.initial_capital
     tf = bt.tf
-    common = {
+    common: dict[str, Any] = {
         "execution": config.execution,
         "risk": config.risk,
         "portfolio": config.portfolio,
@@ -273,7 +275,9 @@ def run_on_bars(
     books: dict[str, Book] = {}
     if bt.mode == "portfolio":
         book = Simulator(feeds, strategy, costs, capital=capital, name=PORTFOLIO, **common).run()
-        book.buy_hold = buy_and_hold(feeds, costs, capital, config.execution, book.equity.index)
+        book.buy_hold = buy_and_hold(
+            feeds, costs, capital, config.execution, pd.DatetimeIndex(book.equity.index)
+        )
         books[PORTFOLIO] = book
         primary = PORTFOLIO
     else:
@@ -282,7 +286,7 @@ def run_on_bars(
                 [feed], strategy, costs, capital=capital, name=feed.symbol, **common
             ).run()
             book.buy_hold = buy_and_hold(
-                [feed], costs, capital, config.execution, book.equity.index
+                [feed], costs, capital, config.execution, pd.DatetimeIndex(book.equity.index)
             )
             books[feed.symbol] = book
         if len(feeds) > 1:

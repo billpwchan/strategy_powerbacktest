@@ -238,3 +238,30 @@ def test_on_bar_sees_only_history():
         name=HKI.symbol,
     ).run()
     assert _Peek.seen == [0, 1, 2, 3]
+
+
+def test_every_module_imports_in_a_fresh_interpreter():
+    """Catches import cycles hidden when tests import modules in a lucky order."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2] / "src"
+    modules = sorted(
+        ".".join(p.relative_to(root).with_suffix("").parts).removesuffix(".__init__")
+        for p in (root / "powerbacktest").rglob("*.py")
+        if p.name != "__main__.py"
+    )
+    code = "import importlib, sys\nfor m in sys.argv[1:]:\n    importlib.import_module(m)\n"
+    procs = {
+        m: subprocess.Popen(
+            [sys.executable, "-c", code, m],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for m in modules
+    }
+    for module, proc in procs.items():
+        _, err = proc.communicate()
+        assert proc.returncode == 0, f"{module}: {err.strip().splitlines()[-1]}"
