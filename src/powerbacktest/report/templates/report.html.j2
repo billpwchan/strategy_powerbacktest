@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --ring: rgba(11,11,11,0.10);
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --s4: #eda100;
+  --pos-text: #006300;
+  --neg-text: #b42424;
+  --up: #1a9e6a;
+  --down: #d64545;
+  --div-pos: 42,120,214;
+  --div-neg: 227,73,72;
+  --div-mid: #f0efec;
+  --warn-bg: #fff6e0;
+  --warn-ink: #6b4a00;
+  --bench: #898781;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --ring: rgba(255,255,255,0.10);
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --s4: #c98500;
+    --pos-text: #0ca30c;
+    --neg-text: #e66767;
+    --up: #22b37a;
+    --down: #e05d5d;
+    --div-pos: 57,135,229;
+    --div-neg: 230,103,103;
+    --div-mid: #383835;
+    --warn-bg: #3a2e10;
+    --warn-ink: #fbd98a;
+    --bench: #9c9a93;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --ring: rgba(255,255,255,0.10);
+  --s1: #3987e5;
+  --s2: #d95926;
+  --s3: #199e70;
+  --s4: #c98500;
+  --pos-text: #0ca30c;
+  --neg-text: #e66767;
+  --up: #22b37a;
+  --down: #e05d5d;
+  --div-pos: 57,135,229;
+  --div-neg: 230,103,103;
+  --div-mid: #383835;
+  --warn-bg: #3a2e10;
+  --warn-ink: #fbd98a;
+  --bench: #9c9a93;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", "PingFang HK", "Microsoft JhengHei", sans-serif;
+}
+.page { max-width: 1320px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
+h2 { font-size: 15px; margin: 0; font-weight: 650; }
+h3 { font-size: 13px; margin: 16px 0 8px; font-weight: 600; color: var(--ink-2); }
+.meta { margin: 0; color: var(--ink-2); }
+.top { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+select, button {
+  font: inherit; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--ring); border-radius: 8px; padding: 6px 10px; cursor: pointer;
+}
+button:hover, select:hover { border-color: var(--axis); }
+label.ctl { display: flex; gap: 6px; align-items: center; color: var(--ink-2); }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 16px; margin-bottom: 16px; min-width: 0; }
+.card-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.card-head.sub { margin-top: 12px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.grid2 > .card { margin-bottom: 0; }
+.grid2 { margin-bottom: 16px; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.chart { width: 100%; position: relative; }
+.h-lg { height: 520px; } .h-md { height: 340px; } .h-sm { height: 150px; }
+@media (max-width: 600px) { .h-lg { height: 420px; } .h-md { height: 260px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--ink-2); font-size: 12px; min-height: 18px; }
+.legend .key { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.legend b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tile { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 12px 14px; }
+.tile .k { color: var(--ink-2); font-size: 12px; }
+.tile .v { font-size: 24px; font-weight: 650; margin-top: 2px; }
+.tile .s { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.pos { color: var(--pos-text); } .neg { color: var(--neg-text); }
+.warn { background: var(--warn-bg); color: var(--warn-ink); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; }
+.warn strong { display: block; margin-bottom: 4px; }
+.warn ul { margin: 0; padding-left: 18px; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 8px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--grid); }
+th { color: var(--ink-2); font-weight: 600; font-size: 12px; position: sticky; top: 0; background: var(--surface); }
+th:first-child, td:first-child { text-align: left; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--ink); }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: var(--div-mid); }
+tr.selected td { background: var(--div-mid); }
+td.heat { color: var(--ink); min-width: 52px; }
+.metrics-grid { column-width: 260px; column-gap: 24px; }
+.metrics-group { margin-bottom: 8px; break-inside: avoid; }
+.metrics-group h3:first-child { margin-top: 0; }
+.table-wrap.scroll { max-height: 460px; overflow-y: auto; }
+.metrics-group table td:first-child { color: var(--ink-2); }
+.hint { color: var(--muted); font-size: 12px; margin: 4px 0 10px; }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; }
+.kv dt { color: var(--ink-2); } .kv dd { margin: 0; overflow-wrap: anywhere; }
+pre { background: var(--page); border-radius: 8px; padding: 12px; overflow-x: auto; font-size: 12px; }
+details summary { cursor: pointer; color: var(--ink-2); margin-top: 12px; }
+footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+footer a { color: var(--ink-2); }
+.empty { color: var(--muted); padding: 12px 0; }
+.badge { display: inline-block; font-size: 11px; border: 1px solid var(--ring); border-radius: 999px; padding: 1px 8px; color: var(--ink-2); margin-left: 6px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div>
+      <h1 id="title">{{ title }}</h1>
+      <p class="meta" id="meta"></p>
+    </div>
+    <div class="controls">
+      <label class="ctl">Book <select id="bookSel" aria-label="Book"></select></label>
+      <button id="colorToggle" type="button" title="Candle colours"></button>
+      <button id="themeToggle" type="button" title="Theme"></button>
+    </div>
+  </header>
+
+  <div id="warnings"></div>
+  <section class="tiles" id="tiles" aria-label="Key metrics"></section>
+
+  <section class="card">
+    <div class="card-head"><h2>Equity</h2><div class="legend" id="eqLegend"></div></div>
+    <div id="eqChart" class="chart h-md"></div>
+    <div class="card-head sub"><h3 style="margin:0">Drawdown</h3><div class="legend" id="ddLegend"></div></div>
+    <div id="ddChart" class="chart h-sm"></div>
+  </section>
+
+  <section class="card"><h2>Monthly returns</h2><p class="hint">Compounded return per calendar month; the last column is the calendar year.</p><div id="monthly" class="table-wrap"></div></section>
+  <section class="card"><h2>Metrics</h2><div id="metrics" class="metrics-grid"></div><div id="metricsNotes"></div></section>
+
+  <section class="card" id="scanCard">
+    <h2>Symbols</h2>
+    <p class="hint" id="scanSummary"></p>
+    <div id="scanTable" class="table-wrap"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Price and trades</h2><label class="ctl">Symbol <select id="symSel" aria-label="Symbol"></select></label></div>
+    <div class="legend" id="pxLegend"></div>
+    <div id="pxChart" class="chart h-lg"></div>
+    <h3>Trades</h3>
+    <div id="tradeTable" class="table-wrap scroll"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="card" id="corrCard"><h2>Strategy return correlation</h2><p class="hint">Pearson correlation of per-bar strategy returns between symbols.</p><div id="corr" class="table-wrap"></div></section>
+    <section class="card"><h2>Worst drawdowns</h2><div id="ddTable" class="table-wrap"></div></section>
+  </div>
+
+  <section class="card">
+    <h2>Assumptions</h2>
+    <dl class="kv" id="assumptions"></dl>
+    <details><summary>Resolved configuration</summary><pre id="configYaml"></pre></details>
+  </section>
+
+  <footer>
+    Generated by strategy_powerbacktest <span id="version"></span>. Charts by
+    <a href="https://www.tradingview.com/" rel="noopener">TradingView Lightweight Charts™</a>
+    (Apache-2.0). Backtest results are hypothetical and do not predict live performance.
+  </footer>
+</div>
+
+<script>{{ chart_js | safe }}</script>
+<script id="payload" type="application/json">{{ payload_json | safe }}</script>
+<script>
+(function () {
+  "use strict";
+  var P = JSON.parse(document.getElementById("payload").textContent);
+  var LC = window.LightweightCharts;
+  var M = P.meta;
+  function $(id) { return document.getElementById(id); }
+  var store = {
+    get: function (k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function num(v) { return typeof v === "number" && isFinite(v); }
+  function minus(s) { return s.charAt(0) === "-" ? "−" + s.slice(1) : s; }
+  function pct(v, d) {
+    if (v === "inf") return "∞"; if (!num(v)) return "—";
+    return minus((v * 100).toFixed(d == null ? 2 : d)) + "%";
+  }
+  function spct(v, d) {
+    if (!num(v)) return pct(v, d);
+    var s = (v * 100).toFixed(d == null ? 2 : d);
+    return (v > 0 ? "+" : v < 0 ? "−" : "") + s.replace("-", "") + "%";
+  }
+  function fx(v, d) {
+    if (v === "inf") return "∞"; if (!num(v)) return "—";
+    return minus(v.toLocaleString(undefined, { minimumFractionDigits: d == null ? 2 : d, maximumFractionDigits: d == null ? 2 : d }));
+  }
+  function money(v) { return num(v) ? minus(v.toLocaleString(undefined, { maximumFractionDigits: 0 })) : "—"; }
+  function signCls(v) { return !num(v) ? "" : v > 0 ? "pos" : v < 0 ? "neg" : ""; }
+  function dateOf(secs) { return new Date(secs * 1000).toISOString().slice(0, M.intraday ? 16 : 10).replace("T", " "); }
+  function isoDate(s) { return s ? String(s).slice(0, M.intraday ? 16 : 10).replace("T", " ") : "—"; }
+  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  // ------------------------------------------------------------ header
+  var bookLabels = {};
+  bookLabels[P.composite_key] = "Composite (equal split)";
+  bookLabels[P.portfolio_key] = "Portfolio";
+  function bookLabel(key) {
+    if (bookLabels[key]) return bookLabels[key];
+    var s = P.symbols[key];
+    return s && s.name ? key + " " + s.name : key;
+  }
+  $("version").textContent = "v" + M.version;
+  var params = M.strategy.params || {};
+  var paramText = Object.keys(params).map(function (k) { return k + "=" + params[k]; }).join(", ");
+  $("meta").textContent = [
+    M.strategy.name + (paramText ? " (" + paramText + ")" : ""),
+    M.timeframe, M.start + " → " + M.end,
+    M.mode === "scan" ? "scan mode" : "portfolio mode",
+    M.symbols.length + " symbol" + (M.symbols.length > 1 ? "s" : ""),
+    "capital " + money(M.initial_capital)
+  ].join(" · ");
+
+  var warn = (P.warnings || []).slice();
+  if (warn.length) {
+    $("warnings").innerHTML = '<div class="warn" role="note"><strong>⚠ Warnings (' + warn.length + ")</strong><ul>" +
+      warn.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + "</ul></div>";
+  }
+
+  var bookSel = $("bookSel");
+  P.book_order.forEach(function (k) {
+    var o = document.createElement("option"); o.value = k; o.textContent = bookLabel(k); bookSel.appendChild(o);
+  });
+  var symSel = $("symSel");
+  Object.keys(P.symbols).forEach(function (k) {
+    var o = document.createElement("option"); o.value = k; o.textContent = bookLabel(k); symSel.appendChild(o);
+  });
+
+  // ------------------------------------------------------------- theme
+  function currentTheme() {
+    var t = document.documentElement.dataset.theme;
+    if (t) return t;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  var savedTheme = store.get("pbt-theme", "");
+  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+  function paintThemeButton() { $("themeToggle").textContent = currentTheme() === "dark" ? "☀ Light" : "☾ Dark"; }
+  $("themeToggle").addEventListener("click", function () {
+    var next = currentTheme() === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next; store.set("pbt-theme", next);
+    paintThemeButton(); renderAll();
+  });
+  var redUp = store.get("pbt-updown", "green-up") === "red-up";
+  function paintColorButton() { $("colorToggle").textContent = redUp ? "Red up / green down" : "Green up / red down"; }
+  $("colorToggle").addEventListener("click", function () {
+    redUp = !redUp; store.set("pbt-updown", redUp ? "red-up" : "green-up"); paintColorButton(); renderPrice();
+  });
+  paintThemeButton(); paintColorButton();
+  if (window.matchMedia) {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+      if (!document.documentElement.dataset.theme) { paintThemeButton(); renderAll(); }
+    });
+  }
+
+  function chartOptions() {
+    return {
+      autoSize: true,
+      layout: {
+        background: { type: "solid", color: css("--surface") },
+        textColor: css("--muted"),
+        fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+        fontSize: 11,
+        attributionLogo: true,
+        panes: { separatorColor: css("--grid"), separatorHoverColor: css("--grid") }
+      },
+      grid: { vertLines: { visible: false }, horzLines: { color: css("--grid") } },
+      rightPriceScale: { borderColor: css("--axis") },
+      timeScale: { borderColor: css("--axis"), timeVisible: !!M.intraday, secondsVisible: false },
+      crosshair: { mode: LC.CrosshairMode.Normal },
+      handleScroll: { vertTouchDrag: false }
+    };
+  }
+  function pts(arr) { return (arr || []).map(function (p) { return { time: p[0], value: p[1] }; }); }
+  function key(color, label, value) {
+    return '<span class="key"><span class="sw" style="background:' + color + '"></span>' + esc(label) +
+      (value != null ? " <b>" + value + "</b>" : "") + "</span>";
+  }
+
+  // ------------------------------------------------------ equity charts
+  var eqChart = null, ddChart = null;
+  var MONEY_FMT = { type: "custom", minMove: 1, formatter: function (v) { return Math.round(v).toLocaleString(); } };
+  function renderEquity(book) {
+    if (eqChart) { eqChart.remove(); eqChart = null; }
+    if (ddChart) { ddChart.remove(); ddChart = null; }
+    eqChart = LC.createChart($("eqChart"), chartOptions());
+    var sName = bookLabel(book.name);
+    var bName = book.benchmark_name || "Benchmark";
+    var bench = null;
+    if (book.benchmark) {
+      bench = eqChart.addSeries(LC.LineSeries, { color: css("--bench"), lineWidth: 2, priceLineVisible: false, lastValueVisible: true, priceFormat: MONEY_FMT });
+      bench.setData(pts(book.benchmark));
+    }
+    var strat = eqChart.addSeries(LC.LineSeries, { color: css("--s1"), lineWidth: 2, priceLineVisible: false, priceFormat: MONEY_FMT });
+    strat.setData(pts(book.equity));
+    eqChart.timeScale().fitContent();
+
+    ddChart = LC.createChart($("ddChart"), chartOptions());
+    var dd = ddChart.addSeries(LC.AreaSeries, {
+      lineColor: css("--neg-text"), topColor: "rgba(" + css("--div-neg") + ",0.05)",
+      bottomColor: "rgba(" + css("--div-neg") + ",0.35)", lineWidth: 2, priceLineVisible: false,
+      priceFormat: { type: "percent", precision: 1, minMove: 0.1 }
+    });
+    dd.setData((book.drawdown || []).map(function (p) { return { time: p[0], value: p[1] * 100 }; }));
+    ddChart.timeScale().fitContent();
+
+    var lastEq = book.equity.length ? book.equity[book.equity.length - 1][1] : null;
+    var lastB = book.benchmark && book.benchmark.length ? book.benchmark[book.benchmark.length - 1][1] : null;
+    function eqLegend(v, b, t) {
+      $("eqLegend").innerHTML = key(css("--s1"), sName, money(v)) + (bench ? key(css("--bench"), bName, money(b)) : "") +
+        (t ? '<span class="key">' + dateOf(t) + "</span>" : "");
+    }
+    eqLegend(lastEq, lastB, null);
+    var lastDd = book.drawdown.length ? book.drawdown[book.drawdown.length - 1][1] : null;
+    function ddLegend(v, t) { $("ddLegend").innerHTML = key(css("--neg-text"), "Drawdown", pct(v, 1)) + (t ? '<span class="key">' + dateOf(t) + "</span>" : ""); }
+    ddLegend(lastDd, null);
+    eqChart.subscribeCrosshairMove(function (param) {
+      if (!param.time) { eqLegend(lastEq, lastB, null); return; }
+      var a = param.seriesData.get(strat), b = bench ? param.seriesData.get(bench) : null;
+      eqLegend(a ? a.value : null, b ? b.value : null, param.time);
+    });
+    ddChart.subscribeCrosshairMove(function (param) {
+      if (!param.time) { ddLegend(lastDd, null); return; }
+      var a = param.seriesData.get(dd); ddLegend(a ? a.value / 100 : null, param.time);
+    });
+    var syncing = false;
+    function sync(from, to) {
+      from.timeScale().subscribeVisibleLogicalRangeChange(function (r) {
+        if (syncing || !r) return; syncing = true; to.timeScale().setVisibleLogicalRange(r); syncing = false;
+      });
+    }
+    sync(eqChart, ddChart); sync(ddChart, eqChart);
+  }
+
+  // -------------------------------------------------------------- tiles
+  function tile(k, v, cls, s) {
+    return '<div class="tile"><div class="k">' + esc(k) + '</div><div class="v ' + (cls || "") + '">' + v +
+      "</div>" + (s ? '<div class="s">' + s + "</div>" : "") + "</div>";
+  }
+  function renderTiles(book) {
+    var m = book.metrics || {};
+    var bn = book.benchmark_name || "benchmark";
+    var bRet = num(m.benchmark_total_return) ? m.benchmark_total_return : m.buy_hold_return;
+    $("tiles").innerHTML = [
+      tile("Total return", spct(m.total_return), signCls(m.total_return), esc(bn) + " " + spct(bRet)),
+      tile("CAGR", spct(m.cagr), signCls(m.cagr), "over " + fx(m.years, 1) + " years"),
+      tile("Sharpe", fx(m.sharpe), "", "Sortino " + fx(m.sortino) + " · vol " + pct(m.volatility, 1)),
+      tile("Max drawdown", pct(m.max_drawdown, 1), "neg", fx(m.max_drawdown_days, 0) + " days peak to recovery"),
+      tile("Trades", String(num(m.trades) ? m.trades : 0), "", "win " + pct(m.win_rate, 0) + " · PF " + fx(m.profit_factor)),
+      tile("Exposure", pct(m.exposure, 0), "", "in market " + pct(m.time_in_market, 0) + " of bars"),
+      tile("Costs", money(m.total_fees), "", pct(m.fees_pct_of_capital) + " of capital")
+    ].join("");
+  }
+
+  // ------------------------------------------------------------ monthly
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Year"];
+  function heat(v, maxAbs) {
+    if (!num(v) || !maxAbs) return "";
+    var a = Math.min(Math.abs(v) / maxAbs, 1) * 0.55 + 0.08;
+    return "background: rgba(" + (v >= 0 ? css("--div-pos") : css("--div-neg")) + "," + a.toFixed(3) + ")";
+  }
+  function renderMonthly(book) {
+    var mo = book.monthly;
+    if (!mo || !mo.years.length) { $("monthly").innerHTML = '<div class="empty">No data</div>'; return; }
+    var maxAbs = 0;
+    mo.rows.forEach(function (r) { r.slice(0, 12).forEach(function (v) { if (num(v)) maxAbs = Math.max(maxAbs, Math.abs(v)); }); });
+    var h = "<table><thead><tr><th>Year</th>" + MONTHS.map(function (m) { return "<th>" + m + "</th>"; }).join("") + "</tr></thead><tbody>";
+    mo.years.forEach(function (y, i) {
+      h += "<tr><td>" + y + "</td>" + mo.rows[i].map(function (v, j) {
+        var style = j < 12 ? heat(v, maxAbs) : "";
+        var cls = j < 12 ? "heat" : signCls(v);
+        return '<td class="' + cls + '" style="' + style + '">' + (num(v) ? spct(v, 1) : "") + "</td>";
+      }).join("") + "</tr>";
+    });
+    $("monthly").innerHTML = h + "</tbody></table>";
+  }
+
+  // ------------------------------------------------------------ metrics
+  var GROUPS = [
+    ["Returns", [["total_return", "Total return", spct], ["cagr", "CAGR", spct], ["final_equity", "Final equity", money],
+      ["best_bar", "Best bar", spct], ["worst_bar", "Worst bar", spct]]],
+    ["Risk", [["volatility", "Volatility (ann.)", pct], ["sharpe", "Sharpe", fx], ["sortino", "Sortino", fx], ["calmar", "Calmar", fx],
+      ["max_drawdown", "Max drawdown", pct], ["max_drawdown_days", "Max drawdown length (days)", function (v) { return fx(v, 0); }],
+      ["var_95", "VaR 95% (per bar)", pct], ["cvar_95", "CVaR 95% (per bar)", pct]]],
+    ["Trades", [["trades", "Closed trades", function (v) { return fx(v, 0); }], ["open_trades", "Open at end", function (v) { return fx(v, 0); }],
+      ["win_rate", "Win rate", pct], ["profit_factor", "Profit factor", fx], ["payoff_ratio", "Payoff ratio", fx],
+      ["avg_trade_return", "Avg trade return", spct], ["expectancy", "Avg P&L per trade", money], ["largest_win", "Largest win", money],
+      ["largest_loss", "Largest loss", money], ["max_consecutive_losses", "Max losing streak", function (v) { return fx(v, 0); }],
+      ["avg_bars_held", "Avg bars held", function (v) { return fx(v, 1); }], ["avg_days_held", "Avg days held", function (v) { return fx(v, 1); }],
+      ["realized_pnl", "Realised P&L", money], ["unrealized_pnl", "Unrealised P&L", money]]],
+    ["Costs and activity", [["total_fees", "Fees paid", money], ["fees_pct_of_capital", "Fees / capital", pct], ["turnover", "Turnover (x/yr)", fx],
+      ["exposure", "Avg exposure", pct], ["time_in_market", "Time in market", pct], ["fills", "Fills", function (v) { return fx(v, 0); }]]],
+    ["Against benchmark", [["benchmark_total_return", "Benchmark return", spct], ["buy_hold_return", "Buy & hold return", spct],
+      ["excess_return", "Excess return", spct], ["beta", "Beta", fx], ["alpha", "Alpha (ann.)", spct], ["correlation", "Correlation", fx],
+      ["information_ratio", "Information ratio", fx], ["tracking_error", "Tracking error", pct]]]
+  ];
+  var SIGNED = { total_return: 1, cagr: 1, avg_trade_return: 1, excess_return: 1, alpha: 1, expectancy: 1, realized_pnl: 1, unrealized_pnl: 1 };
+  function renderMetrics(book) {
+    var m = book.metrics || {};
+    var h = "";
+    GROUPS.forEach(function (g) {
+      var rows = g[1].filter(function (r) { return r[0] in m; });
+      if (!rows.length) return;
+      h += '<div class="metrics-group"><h3>' + g[0] + "</h3><table><tbody>" + rows.map(function (r) {
+        var cls = SIGNED[r[0]] ? signCls(m[r[0]]) : "";
+        return "<tr><td>" + r[1] + '</td><td class="' + cls + '">' + r[2](m[r[0]]) + "</td></tr>";
+      }).join("") + "</tbody></table></div>";
+    });
+    $("metrics").innerHTML = h;
+    var notes = "";
+    if (m.composite_note) notes += '<p class="hint">' + esc(m.composite_note) + "</p>";
+    if (m.exit_reasons) {
+      notes += '<p class="hint">Exit reasons: ' + Object.keys(m.exit_reasons).map(function (k) { return esc(k) + " " + m.exit_reasons[k]; }).join(", ") + "</p>";
+    }
+    $("metricsNotes").innerHTML = notes;
+  }
+
+  // --------------------------------------------------------------- scan
+  var scanSort = { key: "total_return", dir: -1 };
+  var SCAN_COLS = [
+    ["symbol", "Symbol", null], ["total_return", "Return", spct], ["buy_hold_return", "Buy & hold", spct], ["edge", "vs B&H", spct],
+    ["cagr", "CAGR", spct], ["sharpe", "Sharpe", fx], ["max_drawdown", "Max DD", pct], ["trades", "Trades", function (v) { return fx(v, 0); }],
+    ["win_rate", "Win", function (v) { return pct(v, 0); }], ["profit_factor", "PF", fx], ["exposure", "Exposure", function (v) { return pct(v, 0); }],
+    ["total_fees", "Fees", money]
+  ];
+  function scanRows() {
+    return Object.keys(P.books).filter(function (k) { return k !== P.composite_key && k !== P.portfolio_key; }).map(function (k) {
+      var m = P.books[k].metrics || {};
+      var r = { symbol: k };
+      SCAN_COLS.forEach(function (c) { if (c[0] in m) r[c[0]] = m[c[0]]; });
+      r.edge = num(m.total_return) && num(m.buy_hold_return) ? m.total_return - m.buy_hold_return : null;
+      return r;
+    });
+  }
+  function renderScan() {
+    if (M.mode !== "scan" || Object.keys(P.symbols).length < 2) { $("scanCard").style.display = "none"; return; }
+    var rows = scanRows();
+    var n = rows.length;
+    var prof = rows.filter(function (r) { return num(r.total_return) && r.total_return > 0; }).length;
+    var beat = rows.filter(function (r) { return num(r.edge) && r.edge > 0; }).length;
+    var rets = rows.map(function (r) { return r.total_return; }).filter(num).sort(function (a, b) { return a - b; });
+    var med = rets.length ? (rets.length % 2 ? rets[(rets.length - 1) / 2] : (rets[rets.length / 2 - 1] + rets[rets.length / 2]) / 2) : null;
+    $("scanSummary").textContent = prof + " of " + n + " symbols profitable · " + beat + " beat buy & hold · median return " + spct(med) +
+      ". Each symbol is simulated alone with the full capital. Click a row to inspect it.";
+    rows.sort(function (a, b) {
+      var x = a[scanSort.key], y = b[scanSort.key];
+      if (scanSort.key === "symbol") return scanSort.dir * String(x).localeCompare(String(y));
+      x = num(x) ? x : -Infinity; y = num(y) ? y : -Infinity; return scanSort.dir * (x - y);
+    });
+    var sel = symSel.value;
+    var h = "<table><thead><tr>" + SCAN_COLS.map(function (c) {
+      var arrow = scanSort.key === c[0] ? (scanSort.dir > 0 ? " ▲" : " ▼") : "";
+      return '<th class="sortable" data-k="' + c[0] + '">' + c[1] + arrow + "</th>";
+    }).join("") + "</tr></thead><tbody>";
+    rows.forEach(function (r) {
+      h += '<tr class="clickable' + (r.symbol === sel ? " selected" : "") + '" data-s="' + esc(r.symbol) + '">' + SCAN_COLS.map(function (c) {
+        if (c[0] === "symbol") return "<td>" + esc(bookLabel(r.symbol)) + "</td>";
+        var cls = { total_return: 1, edge: 1, cagr: 1, buy_hold_return: 1 }[c[0]] ? signCls(r[c[0]]) : "";
+        return '<td class="' + cls + '">' + c[2](r[c[0]]) + "</td>";
+      }).join("") + "</tr>";
+    });
+    $("scanTable").innerHTML = h + "</tbody></table>";
+    Array.prototype.forEach.call($("scanTable").querySelectorAll("th.sortable"), function (th) {
+      th.addEventListener("click", function () {
+        var k = th.getAttribute("data-k");
+        scanSort = { key: k, dir: scanSort.key === k ? -scanSort.dir : (k === "symbol" ? 1 : -1) }; renderScan();
+      });
+    });
+    Array.prototype.forEach.call($("scanTable").querySelectorAll("tr.clickable"), function (tr) {
+      tr.addEventListener("click", function () {
+        var s = tr.getAttribute("data-s"); symSel.value = s; bookSel.value = s; renderBook(); renderPrice(); renderScan();
+      });
+    });
+  }
+
+  // -------------------------------------------------------------- price
+  var pxChart = null;
+  function renderPrice() {
+    if (pxChart) { pxChart.remove(); pxChart = null; }
+    var sym = P.symbols[symSel.value];
+    if (!sym) return;
+    pxChart = LC.createChart($("pxChart"), chartOptions());
+    var up = redUp ? css("--down") : css("--up"), down = redUp ? css("--up") : css("--down");
+    var candles = pxChart.addSeries(LC.CandlestickSeries, {
+      upColor: up, downColor: down, wickUpColor: up, wickDownColor: down, borderVisible: false, priceLineVisible: false
+    });
+    candles.setData(sym.ohlc.map(function (r) { return { time: r[0], open: r[1], high: r[2], low: r[3], close: r[4] }; }));
+    var palette = [css("--s1"), css("--s2"), css("--s3"), css("--s4")];
+    var priceIdx = 0, lowerIdx = 0, series = [];
+    sym.plots.forEach(function (p) {
+      var pane = p.pane === "price" ? 0 : 1;
+      var color = palette[(pane === 0 ? priceIdx++ : lowerIdx++) % palette.length];
+      var s;
+      if (p.kind === "histogram") {
+        s = pxChart.addSeries(LC.HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, pane);
+        s.setData(p.data.map(function (d) { return { time: d[0], value: d[1], color: "rgba(" + (d[1] >= 0 ? css("--div-pos") : css("--div-neg")) + ",0.55)" }; }));
+        color = css("--muted");
+      } else {
+        s = pxChart.addSeries(LC.LineSeries, { color: color, lineWidth: pane === 0 ? 2 : 1.5, priceLineVisible: false, lastValueVisible: false }, pane);
+        s.setData(pts(p.data));
+      }
+      series.push({ s: s, label: p.label, color: color });
+    });
+    var panes = pxChart.panes();
+    if (panes.length > 1) { panes[0].setStretchFactor(2.4); panes[1].setStretchFactor(1); }
+    var markers = sym.fills.slice().sort(function (a, b) { return a.time - b.time; }).map(function (f) {
+      var buy = f.side === "BUY";
+      return {
+        time: f.time, position: buy ? "belowBar" : "aboveBar", shape: buy ? "arrowUp" : "arrowDown",
+        color: buy ? css("--s1") : css("--s2"), text: (buy ? "B" : "S") + (f.reason !== "signal" ? " " + f.reason.replace("_", " ") : "")
+      };
+    });
+    LC.createSeriesMarkers(candles, markers);
+    pxChart.timeScale().fitContent();
+    var last = sym.ohlc.length ? sym.ohlc[sym.ohlc.length - 1] : null;
+    function legend(bar, t, values) {
+      var h = "";
+      if (bar) {
+        h += '<span class="key">' + (t ? dateOf(t) : dateOf(bar.time || last[0])) + "</span>";
+        h += '<span class="key">O <b>' + fx(bar.open, 3) + "</b> H <b>" + fx(bar.high, 3) + "</b> L <b>" + fx(bar.low, 3) + "</b> C <b>" + fx(bar.close, 3) + "</b></span>";
+      }
+      series.forEach(function (x, i) { h += key(x.color, x.label, values ? fx(values[i], 3) : null); });
+      h += '<span class="key">▲ buy · ▼ sell · lot ' + sym.lot_size + " · " + esc(sym.currency) + "</span>";
+      if (sym.truncated) h += '<span class="key">(latest bars only)</span>';
+      $("pxLegend").innerHTML = h;
+    }
+    legend(last ? { time: last[0], open: last[1], high: last[2], low: last[3], close: last[4] } : null, null, null);
+    pxChart.subscribeCrosshairMove(function (param) {
+      if (!param.time) { legend(last ? { time: last[0], open: last[1], high: last[2], low: last[3], close: last[4] } : null, null, null); return; }
+      var b = param.seriesData.get(candles);
+      var vals = series.map(function (x) { var d = param.seriesData.get(x.s); return d ? d.value : null; });
+      legend(b, param.time, vals);
+    });
+    renderTrades(symSel.value);
+  }
+
+  function tradesFor(symbol) {
+    var book = P.books[symbol] || P.books[P.portfolio_key] || P.books[P.primary];
+    return (book.trades || []).filter(function (t) { return t.symbol === symbol; });
+  }
+  function renderTrades(symbol) {
+    var trades = tradesFor(symbol);
+    if (!trades.length) { $("tradeTable").innerHTML = '<div class="empty">No trades for this symbol.</div>'; return; }
+    var h = "<table><thead><tr><th>Entry</th><th>Exit</th><th>Qty</th><th>Entry px</th><th>Exit px</th><th>P&amp;L</th><th>Return</th><th>Fees</th><th>Bars</th><th>MAE</th><th>MFE</th><th>Exit</th></tr></thead><tbody>";
+    trades.forEach(function (t) {
+      h += "<tr><td>" + isoDate(t.entry_time) + "</td><td>" + (t.is_open ? "open" : isoDate(t.exit_time)) + "</td><td>" + fx(t.quantity, 0) +
+        "</td><td>" + fx(t.entry_price, 3) + "</td><td>" + fx(t.exit_price, 3) + '</td><td class="' + signCls(t.pnl) + '">' + money(t.pnl) +
+        '</td><td class="' + signCls(t.return_pct) + '">' + spct(t.return_pct) + "</td><td>" + fx(t.fees) + "</td><td>" + (t.bars_held == null ? "—" : t.bars_held) +
+        "</td><td>" + pct(t.mae_pct, 1) + "</td><td>" + pct(t.mfe_pct, 1) + "</td><td>" + esc(t.exit_reason) + "</td></tr>";
+    });
+    $("tradeTable").innerHTML = h + "</tbody></table>";
+  }
+
+  // --------------------------------------------------------------- corr
+  function renderCorr() {
+    var c = P.correlation;
+    if (!c) { $("corrCard").style.display = "none"; return; }
+    var h = "<table><thead><tr><th></th>" + c.symbols.map(function (s) { return "<th>" + esc(s) + "</th>"; }).join("") + "</tr></thead><tbody>";
+    c.symbols.forEach(function (s, i) {
+      h += "<tr><td>" + esc(s) + "</td>" + c.matrix[i].map(function (v, j) {
+        return '<td class="heat" style="' + (i === j ? "" : heat(v, 1)) + '">' + (num(v) ? v.toFixed(2) : "—") + "</td>";
+      }).join("") + "</tr>";
+    });
+    $("corr").innerHTML = h + "</tbody></table>";
+  }
+
+  function renderDrawdowns(book) {
+    var rows = book.drawdown_periods || [];
+    if (!rows.length) { $("ddTable").innerHTML = '<div class="empty">No drawdowns.</div>'; return; }
+    $("ddTable").innerHTML = "<table><thead><tr><th>Peak</th><th>Trough</th><th>Recovered</th><th>Depth</th><th>Days</th></tr></thead><tbody>" +
+      rows.map(function (r) {
+        return "<tr><td>" + isoDate(r.start) + "</td><td>" + isoDate(r.trough) + "</td><td>" + (r.recovered ? isoDate(r.end) : "not yet") +
+          '</td><td class="neg">' + pct(r.depth, 1) + "</td><td>" + fx(r.days, 0) + "</td></tr>";
+      }).join("") + "</tbody></table>";
+  }
+
+  function renderAssumptions(book) {
+    var ex = M.execution, rk = M.risk, pf = M.portfolio;
+    var fill = ex.fill === "next_open" ? "Signal at bar close, fill at next bar open" : "Fill at the signal bar's close (optimistic, TDX-style)";
+    var risk = [];
+    if (rk.stop_loss) risk.push("stop loss " + pct(rk.stop_loss, 1));
+    if (rk.trailing_stop) risk.push("trailing stop " + pct(rk.trailing_stop, 1));
+    if (rk.take_profit) risk.push("take profit " + pct(rk.take_profit, 1));
+    if (rk.max_holding_bars) risk.push("max hold " + rk.max_holding_bars + " bars");
+    var costs = M.costs || {};
+    var hk = costs.HK || {}, us = costs.US || {};
+    var costText = costs.model === "simple" ? "Simple: " + pct(costs.rate, 3) + " per side, min " + costs.min_fee :
+      "HK statutory schedule by trade date (stamp duty rounded up, levies, trading and settlement fees) + broker " +
+      pct(hk.commission_rate, 3) + " commission (min " + hk.commission_min + ") + " + hk.platform_fee + " platform fee per order; US per-share plan + SEC/TAF on sells";
+    var counts = book.events && book.events.counts ? Object.keys(book.events.counts).map(function (k) { return k + " " + book.events.counts[k]; }).join(", ") : "";
+    var items = [
+      ["Execution", fill + "; slippage " + ex.slippage_ticks + " tick(s)" + (ex.slippage_bps ? " + " + ex.slippage_bps + " bps" : "") +
+        (ex.max_volume_pct ? "; max " + pct(ex.max_volume_pct, 1) + " of bar volume" : "")],
+      ["Entries", ex.entry_requires_fresh_signal ? "Need a fresh signal (not entered mid-signal at the start or right after a risk exit)" : "Enter whenever the signal is long"],
+      ["Sizing", pf.sizer.replace("_", " ") + (pf.sizer === "equal_weight" || M.mode === "portfolio" ? ", max " + pf.max_positions + " positions" : "") + "; whole board lots"],
+      ["Risk exits", risk.length ? risk.join(", ") : "none"],
+      ["Costs", costText],
+      ["Prices", M.adjust === "none" ? "Unadjusted" : (M.adjust === "qfq" ? "Forward-adjusted (qfq)" : "Backward-adjusted (hfq)") + " Futu prices; fills and lot sizing use these prices"],
+      ["Risk-free rate", pct(M.risk_free_rate, 2)],
+      ["Look-ahead check", P.lookahead ? (P.lookahead.ok ? "✓ " : "⚠ ") + P.lookahead.summary : "not run"],
+      ["Order events", counts || "none"],
+      ["Run", M.started_at + " → " + M.finished_at + " UTC"]
+    ];
+    $("assumptions").innerHTML = items.map(function (it) { return "<dt>" + esc(it[0]) + "</dt><dd>" + esc(it[1]) + "</dd>"; }).join("");
+    $("configYaml").textContent = M.config_yaml;
+  }
+
+  // ---------------------------------------------------------------- glue
+  function currentBook() { return P.books[bookSel.value] || P.books[P.primary]; }
+  function renderBook() {
+    var b = currentBook();
+    renderTiles(b); renderEquity(b); renderMonthly(b); renderMetrics(b); renderDrawdowns(b); renderAssumptions(b);
+  }
+  function renderAll() { renderBook(); renderScan(); renderPrice(); renderCorr(); }
+  bookSel.value = P.primary;
+  var firstSym = P.symbols[P.primary] ? P.primary : Object.keys(P.symbols)[0];
+  symSel.value = firstSym;
+  bookSel.addEventListener("change", function () {
+    renderBook();
+    if (P.symbols[bookSel.value]) { symSel.value = bookSel.value; renderPrice(); renderScan(); }
+  });
+  symSel.addEventListener("change", function () { renderPrice(); renderScan(); });
+  renderAll();
+})();
+</script>
+</body>
+</html>
