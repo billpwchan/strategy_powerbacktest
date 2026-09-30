@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from datetime import date
 
 import numpy as np
@@ -273,7 +274,7 @@ def test_read_bar_files_accepts_tdx_chinese_headers(tmp_path):
 
 def test_ticks_to_minute_bars_matches_futu_labels(tmp_path):
     db = tmp_path / "20240304.db"
-    with sqlite3.connect(db) as conn:
+    with closing(sqlite3.connect(db)) as conn, conn:
         conn.execute(
             "CREATE TABLE ticks (symbol TEXT, ts_ms INTEGER, price REAL, volume INTEGER, turnover REAL, seq INTEGER)"
         )
