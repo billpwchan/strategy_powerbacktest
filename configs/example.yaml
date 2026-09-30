@@ -1,0 +1,98 @@
+# strategy_powerbacktest configuration.
+# Every field is optional except backtest.symbols/start/end. CLI flags and
+# `--set dotted.key=value` override anything here.
+
+futu:
+  host: 127.0.0.1          # OpenD address
+  port: 11111
+  rate_limit: 60           # history K-line requests allowed per window
+  rate_window_seconds: 30
+  max_retries: 3
+
+data:
+  dir: data                # Parquet cache; bars are fetched once and reused
+  adjust: qfq              # qfq (forward-adjusted, TDX default) | hfq | none
+  offline: false           # true = never contact OpenD, use the cache only
+  instrument_ttl_days: 7   # refresh board lots / names after this many days
+
+backtest:
+  strategy: macd           # pbt strategies  lists names and parameters
+  params:
+    fast_period: 12
+    slow_period: 26
+    signal_period: 9
+    mode: cross            # cross = act on crossings (futu_algo rule); state = long while DIF > DEA
+  symbols: [HK.00700, HK.09988, HK.00005, HK.02800]
+  start: 2021-01-01
+  end: 2025-12-31
+  timeframe: DAY           # 1M 3M 5M 15M 30M 60M, any minute multiple (2H, 4H, 90M), DAY, WEEK, MON
+  mode: scan               # scan = each symbol alone with full capital; portfolio = shared cash
+  initial_capital: 100000
+  benchmark: HK.800000     # Hang Seng Index; remove to compare against buy & hold
+  lot_sizes: {}            # override board lots, e.g. {HK.00700: 100}
+  strategy_paths: []       # directories/files with your own Strategy subclasses
+  check_lookahead: true    # detect future functions by recomputing on truncated history
+
+execution:
+  fill: next_open          # next_open (no look-ahead) | close (TDX-style, optimistic)
+  slippage_ticks: 1        # adverse ticks per fill, using the HKEX spread table by date
+  slippage_bps: 0
+  max_volume_pct: null     # e.g. 0.1 = at most 10% of a bar's volume per fill
+  liquidate_at_end: false
+  entry_requires_fresh_signal: true
+
+risk:
+  stop_loss: null          # 0.08 = exit 8% below the average entry price (intrabar)
+  take_profit: null
+  trailing_stop: null      # 0.1 = exit 10% below the highest high since entry
+  max_holding_bars: null
+
+portfolio:
+  sizer: auto              # auto | all_in | equal_weight | percent_equity | fixed_value | fixed_lots
+  max_positions: 5
+  percent: null            # for percent_equity
+  value: null              # for fixed_value
+  lots: 1                  # for fixed_lots
+
+costs:
+  model: market            # market = HK/US statutory schedules + broker fees; simple = flat rate
+  hk:                      # Futu HK fixed plan; set commission_rate: 0 during a $0-commission promotion
+    commission_rate: 0.0003
+    commission_min: 3.0
+    platform_fee: 15.0
+    include_statutory: true
+  us:
+    commission_per_share: 0.0049
+    commission_min: 0.99
+    platform_per_share: 0.005
+    platform_min: 1.0
+    max_pct_of_value: 0.005
+    settlement_per_share: 0.003
+    include_regulatory: true
+  simple:
+    rate: 0.001
+    min_fee: 0.0
+
+analytics:
+  risk_free_rate: 0.0
+
+report:
+  output_dir: reports
+  title: null
+  html: true
+  max_bars_per_symbol: 20000
+
+logging:
+  level: INFO
+  file: null
+
+optimize:
+  grid:
+    fast_period: [8, 10, 12, 15]
+    slow_period: [21, 26, 34]
+  metric: sharpe           # any metric key; prefix "-" to minimise
+  split: 2024-01-01        # in-sample before, out-of-sample from this date
+  walk_forward_folds: null # e.g. 4 for an anchored walk-forward (overrides split)
+  top: 10
+  jobs: 0                  # 0 = one process per CPU
+  min_trades: 5
