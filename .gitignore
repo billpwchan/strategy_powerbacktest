@@ -24,6 +24,7 @@ wheels/
 venv/
 ENV/
 env/
+.env
 .env/
 .venv/
 
@@ -92,7 +93,8 @@ wheels/
 *.ipynb
 
 # System Files
-.DS_StoreThumbs.db
+.DS_Store
+Thumbs.db
 *.swp
 *.bak
 *~
