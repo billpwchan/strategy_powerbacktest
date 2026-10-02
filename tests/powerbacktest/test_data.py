@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import sys
 from contextlib import closing
 from datetime import date
 
@@ -295,6 +296,23 @@ def test_ticks_to_minute_bars_matches_futu_labels(tmp_path):
     assert (b931.open, b931.high, b931.close, b931.volume) == (10.1, 10.3, 10.3, 250)
     labels = minute_labels(np.array([ts for ts in []], dtype="int64"), HK)
     assert len(labels) == 0
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="'?' is not allowed in Windows file names")
+def test_ticks_to_minute_bars_handles_uri_characters_in_paths(tmp_path):
+    folder = tmp_path / "ticks #1 100%"
+    folder.mkdir()
+    db = folder / "2024?03?04.db"
+    with closing(sqlite3.connect(db)) as conn, conn:
+        conn.execute(
+            "CREATE TABLE ticks (symbol TEXT, ts_ms INTEGER, price REAL, volume INTEGER, turnover REAL, seq INTEGER)"
+        )
+        ts = pd.Timestamp("2024-03-04 10:00:30", tz="Asia/Hong_Kong").value // 1_000_000
+        conn.execute("INSERT INTO ticks VALUES (?,?,?,?,?,?)", ("HK.00700", ts, 10.0, 100, 1e3, 0))
+    before = sorted(tmp_path.rglob("*"))
+    bars = ticks_to_minute_bars([db], "HK.00700", HK)
+    assert len(bars) == 1 and bars.iloc[0].close == 10.0
+    assert sorted(tmp_path.rglob("*")) == before  # opened read-only, nothing created beside it
 
 
 def test_validate_bars_flags_bad_rows():

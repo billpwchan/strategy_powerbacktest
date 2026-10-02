@@ -87,7 +87,8 @@ def ticks_to_minute_bars(
 ) -> pd.DataFrame:
     frames = []
     for path in expand_paths(db_patterns):
-        with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as conn:
+        uri = path.resolve().as_uri() + "?mode=ro"  # percent-encodes '?', '#' and '%' in the path
+        with closing(sqlite3.connect(uri, uri=True)) as conn:
             frames.append(
                 pd.read_sql_query(
                     "SELECT ts_ms, price, volume, turnover FROM ticks "
